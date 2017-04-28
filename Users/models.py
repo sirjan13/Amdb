@@ -22,3 +22,25 @@ class AccessToken(models.Model):
 
     def generate_access_token(self):
         self.access_token = uuid4()
+
+
+#  This Model Holds information regarding different Movies
+class Movie(models.Model):
+    name = models.CharField(max_length=300)
+    release_date = models.DateTimeField()
+    overall_rating = models.DecimalField(decimal_places=2, max_digits=4, default=0.0)
+    censor_board_rating = models.CharField(max_length=5)
+    duration_in_minutes = models.IntegerField(default=180)
+    poster_picture_url = models.CharField(max_length=300)
+    user = models.ForeignKey(Users)
+
+
+#  stores movie genres
+class Genre(models.Model):
+    name = models.CharField(max_length=255)
+
+
+#  Mapping table to Genre and movies ie one to many mapping
+class MovieGenre(models.Model):
+    movie = models.ForeignKey(Movie)
+    genre = models.ForeignKey(Genre)

@@ -1,10 +1,11 @@
 from __future__ import unicode_literals
 from django.shortcuts import render
 from django.http import HttpResponse
-from Users.serializers import UserSerializer
+from datetime import datetime
+from Users.serializers import UserSerializer,MovieSerializer
 from django.contrib.auth.hashers import make_password, check_password
 from rest_framework.decorators import api_view
-from Users.models import Users,AccessToken
+from Users.models import Users,AccessToken,Movie,Genre,MovieGenre
 from rest_framework.response import Response
 # Create your views here.
 
@@ -98,4 +99,91 @@ def login_user(request):
     else:
         return Response({'error_description ': 'Username is Invalid '}, status=200)
 
+
+def check_token_validity(request):
+    token_provided = request.META['HTTP_TOKEN']
+    validity = AccessToken.objects.filter(access_token=token_provided, is_valid=True).first()
+
+    if validity:
+        return validity.user
+
+    return None
+
+@api_view(['POST'])
+def create_movie(request):
+
+    logged_in_user = check_token_validity(request)
+
+    if logged_in_user:
+
+        if 'name' in request.data:
+            name = request.data['name']
+        else:
+            return Response({'error_description ': 'Movie name not provided '}, status=200)
+
+        if 'duration_in_minutes' in request.data:
+            duration_in_minutes = int(request.data['duration_in_minutes'])
+        else:
+            return Response({'error_description ':'Movie Duration not provided '}, status=200)
+
+        if 'release_date' in request.data:
+            release_date = datetime.strptime(request.data['release_date'], '%Y-%m-%d')
+        else:
+            return Response({'error_description ':'Release date not provided '}, status=200)
+
+        if 'censor_board_rating' in request.data:
+            censor_board_rating = request.data['censor_board_rating']
+        else:
+            return Response({'error_description ': 'Censor Board Rating is not provided '}, status=200)
+
+        if 'poster_picture_url' in request.data:
+            poster_picture_url = request.data['poster_picture_url']
+        else:
+            return Response({'error_description ': 'No poster picture was given '}, status=200)
+
+        if 'genre_id' in request.data:
+            genre_ids = request.data['genre_id']
+        else:
+            return Response({'error_description ': 'No genres provided for the film '}, status=200)
+
+        if len(name) == 0:
+            return Response({'error_description ': 'Name cannot be empty '}, status=200)
+
+        genre_ids = genre_ids.split(',')
+
+        genres = []
+
+        for i in genre_ids:
+            genre_given = Genre.objects.filter(id=i).first()
+
+            if genre_given:
+                genres.append(genre_given)
+
+            else:
+                return Response({"message": "Invalid Genre Id! This genre does not exist make sure u separate genres with ',' "}, status=200)
+
+
+        if duration_in_minutes < 1:
+            return Response({"message": "Duration is invalid. A movie cannot be zero or less minutes long"}, status=200)
+
+        if len(genres) < 1:
+            return Response({"message": "Invalid. A movie has to have atleast one Genre "}, status=200)
+
+        new_movie_created = Movie.objects.create(name=name, duration_in_minutes=duration_in_minutes,
+                          release_date=release_date, censor_board_rating=censor_board_rating,
+                          poster_picture_url=poster_picture_url, user=logged_in_user)
+
+        new_movie_created.save()
+
+        for genre in genres:
+            MovieGenre.objects.create(movie=new_movie_created, genre=genre)
+
+        return Response(MovieSerializer(instance=new_movie_created).data, status=200)
+
+    return Response({"message": "You are not logged in to perform this action"}, status=400)
+
+
+@api_view(['GET'])
+def get_movie(request):
+    pass
 
