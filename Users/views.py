@@ -255,7 +255,11 @@ def user_review(request):
                 return Response({'error_description ': 'Rating is not provided '}, status=200)
 
             if 'review' in request.data:
-                review = request.data['review']
+                if len(request.data['review']):
+                    review = request.data['review']
+                else:
+                    return Response({'error_description ': 'Review is not provided '}, status=200)
+
             else:
                 return Response({'error_description ': 'Review is not provided '}, status=200)
 
