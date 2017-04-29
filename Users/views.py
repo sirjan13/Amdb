@@ -2,11 +2,12 @@ from __future__ import unicode_literals
 from django.shortcuts import render
 from django.http import HttpResponse
 from datetime import datetime
-from Users.serializers import UserSerializer,MovieSerializer
+from Users.serializers import UserSerializer,MovieSerializer,ReviewSerializer
 from django.contrib.auth.hashers import make_password, check_password
 from rest_framework.decorators import api_view
-from Users.models import Users,AccessToken,Movie,Genre,MovieGenre
+from Users.models import Users,AccessToken,Movie,Genre,MovieGenre,Review
 from rest_framework.response import Response
+from django.db.models import Avg
 # Create your views here.
 
 
@@ -150,6 +151,11 @@ def create_movie(request):
         if len(name) == 0:
             return Response({'error_description ': 'Name cannot be empty '}, status=200)
 
+        movie_by_name = Movie.objects.filter(name=name).first()
+
+        if movie_by_name:
+            return Response({'error_description ': 'Movie already Present in database'}, status=200)
+
         genre_names = genre_names.split(',')
 
         genres = []
@@ -170,8 +176,8 @@ def create_movie(request):
             return Response({"message": "Invalid. A movie has to have atleast one Genre "}, status=200)
 
         new_movie_created = Movie.objects.create(name=name, duration_in_minutes=duration_in_minutes,
-                          release_date=release_date, censor_board_rating=censor_board_rating,
-                          poster_picture_url=poster_picture_url, user=logged_in_user)
+                            release_date=release_date, censor_board_rating=censor_board_rating,
+                            poster_picture_url=poster_picture_url, user=logged_in_user)
 
         new_movie_created.save()
 
@@ -223,4 +229,75 @@ def get_movie(request):
     return Response(MovieSerializer(instance=movies,many=True).data, status=200)
 
 
+@api_view(['POST'])
+def user_review(request):
+    logged_in_user = check_token_validity(request)
 
+    if logged_in_user:
+        try:
+
+            if 'movie_name' in request.data:
+                name = request.data['movie_name']
+            else:
+                return Response({'error_description ': 'Movie name not provided '}, status=200)
+
+            if 'rating' in request.data:
+                user_rating = request.data['rating']
+            else:
+                return Response({'error_description ': 'Rating is not provided '}, status=200)
+
+            if 'review' in request.data:
+                review = request.data['review']
+            else:
+                return Response({'error_description ': 'Review is not provided '}, status=200)
+
+        except ValueError:
+
+            return Response({'error_description ': 'Invalid Request.Make sure all fields are properly entered '},
+                            status=200)
+
+        if len(name) == 0:
+            return Response({'error_description ': 'Name cannot be empty '}, status=200)
+
+        movie_id = Movie.objects.filter(name=name).first()
+
+        if movie_id:
+
+            if float(user_rating) >= 5.0:
+                return Response({'error_description ': 'Rating should be LESS than 5 '}, status=200)
+
+            previous_rating = Review.objects.filter(user=logged_in_user, movie=movie_id).first()
+
+            if previous_rating:
+                return Response({'error_description ': 'You have already reviewed this Movie '}, status=200)
+
+            else:
+
+                new_review_created = Review.objects.create(movie=movie_id, rating= user_rating,
+                                                           review=review, user=logged_in_user)
+                new_review_created.save()
+
+                average_rating = Review.objects.filter(movie=movie_id).aggregate(avg_rating=Avg('rating'))
+
+                movie_rating_object = Movie.objects.filter(id=movie_id.id).first()
+                movie_rating_object.overall_rating = average_rating['avg_rating']
+                movie_rating_object.save()
+
+                return Response(ReviewSerializer(instance=new_review_created).data, status=200)
+
+        else:
+            return Response({'error_description ': 'No such movie is in our records '}, status=200)
+    return Response({'error_description ': 'You are not logged in to perform this action '}, status=200)
+
+
+@api_view(['GET','POST'])
+def logout_user(request):
+    token_provided = request.META['HTTP_TOKEN']
+    valid = AccessToken.objects.filter(access_token=token_provided, is_valid=True).first()
+
+    if valid:
+        valid.is_valid=False
+        valid.save()
+        return Response({'message ': 'You have been successfully Logged-Out '}, status=200)
+
+    return Response({'error_description ': 'User could not be found '}, status=400)

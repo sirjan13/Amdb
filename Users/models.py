@@ -44,3 +44,13 @@ class Genre(models.Model):
 class MovieGenre(models.Model):
     movie = models.ForeignKey(Movie)
     genre = models.ForeignKey(Genre)
+
+
+#  to store user reviews and ratings
+class Review(models.Model):
+    movie = models.ForeignKey(Movie)
+    user = models.ForeignKey(Users)
+    rating = models.DecimalField(decimal_places=2, max_digits=3, default=0.0)
+    review = models.CharField(max_length=300)
+
+
