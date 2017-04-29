@@ -11,6 +11,7 @@ from django.db.models import Avg
 # Create your views here.
 
 
+# to create a new user
 @api_view(["POST"])
 def user_create(request):
     min_password_length = 6
@@ -36,13 +37,15 @@ def user_create(request):
     if name is None or len(name) == 0:
         return Response({'error_description': 'No Name entered'}, status=400)
 
-    elif password is None or len(password) < min_password_length:
+    elif password is None or len(password) < min_password_length:    # to check if password length is at least 6
         return Response({'error_description': 'Password should have a minimum of 6 letters'}, status=400)
 
     elif user_name is None or len(user_name) == 0:
         return Response({'error_description': 'No UserName Entered'}, status=400)
 
+    # To check if such a username already exists
     check_valid_username = Users.objects.filter(username=user_name).first()
+
 
     if check_valid_username:
         return Response({'error_description': 'Username already exists'}, status=400)
@@ -53,6 +56,7 @@ def user_create(request):
         return Response(UserSerializer(instance=new_user).data, status=200)
 
 
+# displays details of user passed as query parameter
 @api_view(["GET"])
 def get_user_details(request):
     if 'user_id' in request.query_params :
@@ -83,10 +87,10 @@ def login_user(request):
     if 'password' in request.data:
         password = request.data['password']
 
-    if not username or not password :
+    if not username or not password:    # if either is not present
         return Response({"message": "Invalid request. Username or password not provided."}, status=200)
 
-    current_user = Users.objects.filter(username=username).first()
+    current_user = Users.objects.filter(username=username).first()  # check if such a user exists in database
 
     if current_user:
 
@@ -113,6 +117,7 @@ def check_token_validity(request):
 @api_view(['POST'])
 def create_movie(request):
 
+    #  to check if user is logged in
     logged_in_user = check_token_validity(request)
 
     if logged_in_user:
@@ -151,12 +156,12 @@ def create_movie(request):
         if len(name) == 0:
             return Response({'error_description ': 'Name cannot be empty '}, status=200)
 
-        movie_by_name = Movie.objects.filter(name=name).first()
+        movie_by_name = Movie.objects.filter(name=name).first()  # to check if movie is present
 
         if movie_by_name:
             return Response({'error_description ': 'Movie already Present in database'}, status=200)
 
-        genre_names = genre_names.split(',')
+        genre_names = genre_names.split(',')      # to generate list of comma separated string
 
         genres = []
 
@@ -213,8 +218,8 @@ def get_movie(request):
         for i in range(len(movie_genre)):
             movie_id_list.append(Movie.objects.filter(id=movie_genre[i].movie_id).first().id)
 
-        my_movie_set = set(movie_id_list)
-        movie_id_list = list(my_movie_set)
+        my_movie_set = set(movie_id_list)    # To generate a set having only unique values
+        movie_id_list = list(my_movie_set)    # converts set back to list
 
         if len(movie_id_list):
 
@@ -229,9 +234,12 @@ def get_movie(request):
     return Response(MovieSerializer(instance=movies,many=True).data, status=200)
 
 
+# To post a review for a particualar movie
 @api_view(['POST'])
 def user_review(request):
     logged_in_user = check_token_validity(request)
+
+    # to check if the user is logged in
 
     if logged_in_user:
         try:
@@ -290,12 +298,15 @@ def user_review(request):
     return Response({'error_description ': 'You are not logged in to perform this action '}, status=200)
 
 
-@api_view(['GET','POST'])
+@api_view(['GET', 'POST'])
 def logout_user(request):
     token_provided = request.META['HTTP_TOKEN']
     valid = AccessToken.objects.filter(access_token=token_provided, is_valid=True).first()
 
     if valid:
+
+        # sets the is_valid in AccessToken model is set to False(0)
+
         valid.is_valid=False
         valid.save()
         return Response({'message ': 'You have been successfully Logged-Out '}, status=200)
