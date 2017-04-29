@@ -115,53 +115,53 @@ def create_movie(request):
     logged_in_user = check_token_validity(request)
 
     if logged_in_user:
+        try:
+            if 'name' in request.data:
+                name = request.data['name']
+            else:
+                return Response({'error_description ': 'Movie name not provided '}, status=200)
 
-        if 'name' in request.data:
-            name = request.data['name']
-        else:
-            return Response({'error_description ': 'Movie name not provided '}, status=200)
+            if 'duration_in_minutes' in request.data:
+                duration_in_minutes = int(request.data['duration_in_minutes'])
+            else:
+                return Response({'error_description ':'Movie Duration not provided '}, status=200)
 
-        if 'duration_in_minutes' in request.data:
-            duration_in_minutes = int(request.data['duration_in_minutes'])
-        else:
-            return Response({'error_description ':'Movie Duration not provided '}, status=200)
+            if 'release_date' in request.data:
+                release_date = datetime.strptime(request.data['release_date'], '%Y-%m-%d')
+            else:
+                return Response({'error_description ':'Release date not provided '}, status=200)
 
-        if 'release_date' in request.data:
-            release_date = datetime.strptime(request.data['release_date'], '%Y-%m-%d')
-        else:
-            return Response({'error_description ':'Release date not provided '}, status=200)
+            if 'censor_board_rating' in request.data:
+                censor_board_rating = request.data['censor_board_rating']
+            else:
+                return Response({'error_description ': 'Censor Board Rating is not provided '}, status=200)
 
-        if 'censor_board_rating' in request.data:
-            censor_board_rating = request.data['censor_board_rating']
-        else:
-            return Response({'error_description ': 'Censor Board Rating is not provided '}, status=200)
+            if 'poster_picture_url' in request.data:
+                poster_picture_url = request.data['poster_picture_url']
+            else:
+                return Response({'error_description ': 'No poster picture was given '}, status=200)
 
-        if 'poster_picture_url' in request.data:
-            poster_picture_url = request.data['poster_picture_url']
-        else:
-            return Response({'error_description ': 'No poster picture was given '}, status=200)
-
-        if 'genre_id' in request.data:
-            genre_ids = request.data['genre_id']
-        else:
-            return Response({'error_description ': 'No genres provided for the film '}, status=200)
-
+            if 'genre_name' in request.data:
+                genre_names = request.data['genre_name']
+            else:
+                return Response({'error_description ': 'No genres provided for the film '}, status=200)
+        except ValueError:
+            return Response({'error_description ': 'Invalid Request.Make sure all fields are properly entered '}, status=200)
         if len(name) == 0:
             return Response({'error_description ': 'Name cannot be empty '}, status=200)
 
-        genre_ids = genre_ids.split(',')
+        genre_names = genre_names.split(',')
 
         genres = []
 
-        for i in genre_ids:
-            genre_given = Genre.objects.filter(id=i).first()
+        for i in genre_names:
+            genre_given = Genre.objects.filter(name=i).first()
 
             if genre_given:
                 genres.append(genre_given)
 
             else:
-                return Response({"message": "Invalid Genre Id! This genre does not exist make sure u separate genres with ',' "}, status=200)
-
+                return Response({"message": "Invalid Genre ! This genre does not exist make sure you separate genres with ',' "},status=200)
 
         if duration_in_minutes < 1:
             return Response({"message": "Duration is invalid. A movie cannot be zero or less minutes long"}, status=200)
@@ -185,5 +185,42 @@ def create_movie(request):
 
 @api_view(['GET'])
 def get_movie(request):
-    pass
+
+    movie_id_list = []
+    if 'q' in request.query_params:
+        name_query = request.query_params['q']
+
+        #  here 'name_icontains' manages full match ,partial match and case sensitive matches
+
+        movies = Movie.objects.filter(name__icontains=name_query)
+
+        if movies:
+            for i in range(len(movies)):
+                movie_id_list.append(movies[i].id)
+
+        genre_query = name_query
+
+        genre_id = Genre.objects.filter(name__icontains=genre_query).first()
+
+        movie_genre = MovieGenre.objects.filter(genre=genre_id)
+
+        for i in range(len(movie_genre)):
+            movie_id_list.append(Movie.objects.filter(id=movie_genre[i].movie_id).first().id)
+
+        my_movie_set = set(movie_id_list)
+        movie_id_list = list(my_movie_set)
+
+        if len(movie_id_list):
+
+            for i in range(len(movie_id_list)):
+                movie_id_list[i] = MovieSerializer(instance=Movie.objects.filter(id=movie_id_list[i]).first()).data
+
+            return Response(movie_id_list, status=200)
+
+        return Response({'message ': 'No such Movies found '}, status=400)
+
+    movies = Movie.objects.all()
+    return Response(MovieSerializer(instance=movies,many=True).data, status=200)
+
+
 
